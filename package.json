@@ -1,0 +1,38 @@
+{
+  "name": "smart-table-server",
+  "version": "0.0.0",
+  "description": "allows to move core logic of your smart table to your server.",
+  "main": "./dist/smart-table-server.js",
+  "module": "./index.js",
+  "jsnext:main": "./index.js",
+  "scripts": {
+    "build:test": "rollup -c ./test/rollup.config.js",
+    "build": "rollup -c",
+    "build:example":"rollup -c ./example/rollup.config.js",
+    "test": "npm run build:test && node ./test/dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smart-table/smart-table-server.git"
+  },
+  "keywords": [
+    "smart-table",
+    "ui",
+    "grid",
+    "datatable",
+    "table"
+  ],
+  "author": "Laurent Renard",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/smart-table/smart-table-server/issues"
+  },
+  "homepage": "https://github.com/smart-table/smart-table-server#readme",
+  "devDependencies": {
+    "rollup": "^0.41.6",
+    "rollup-plugin-node-resolve": "^3.0.0",
+    "smart-table-core": "^1.3.5",
+    "smart-table-vanilla": "^0.1.0",
+    "zora": "^0.3.0"
+  }
+}
