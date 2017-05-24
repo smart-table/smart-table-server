@@ -1,6 +1,6 @@
 {
   "name": "smart-table-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "allows to move core logic of your smart table to your server.",
   "main": "./dist/smart-table-server.js",
   "module": "./index.js",
