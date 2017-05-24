@@ -1,6 +1,6 @@
 {
   "name": "smart-table-server",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "allows to move core logic of your smart table to your server.",
   "main": "./dist/smart-table-server.js",
   "module": "./index.js",
@@ -8,7 +8,7 @@
   "scripts": {
     "build:test": "rollup -c ./test/rollup.config.js",
     "build": "rollup -c",
-    "build:example":"rollup -c ./example/rollup.config.js",
+    "build:example": "rollup -c ./example/rollup.config.js",
     "test": "npm run build:test && node ./test/dist/index.js"
   },
   "repository": {
