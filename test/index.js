@@ -1,5 +1,5 @@
 import zora from 'zora';
-import {table} from 'smart-table-core';
+import {smartTable as table} from 'smart-table-core';
 import ext from '../index';
 
 zora()

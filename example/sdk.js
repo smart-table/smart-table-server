@@ -1,5 +1,5 @@
 //a fake sdk to mimic a server: it actually uses another smart-table to process a query and return the result with a random timeout to mimic the http response time
-import {table} from 'smart-table-core';
+import {smartTable as table} from 'smart-table-core';
 
 export default () => {
   const t = table({data});

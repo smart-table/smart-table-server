@@ -655,365 +655,383 @@ function plan$1 () {
   });
 }
 
-function swap (f) {
-  return (a, b) => f(b, a);
-}
-
-function compose (first, ...fns) {
-  return (...args) => fns.reduce((previous, current) => current(previous), first(...args));
-}
-
-function curry (fn, arityLeft) {
-  const arity = arityLeft || fn.length;
-  return (...args) => {
-    const argLength = args.length || 1;
-    if (arity === argLength) {
-      return fn(...args);
-    } else {
-      const func = (...moreArgs) => fn(...args, ...moreArgs);
-      return curry(func, arity - args.length);
-    }
-  };
-}
-
-
-
-function tap$1 (fn) {
-  return arg => {
+const swap = (f) => (a, b) => f(b, a);
+const compose = (first, ...fns) => (...args) => fns.reduce((previous, current) => current(previous), first(...args));
+const curry = (fn, arityLeft) => {
+    const arity = arityLeft || fn.length;
+    return (...args) => {
+        const argLength = args.length || 1;
+        if (arity === argLength) {
+            return fn(...args);
+        }
+        const func = (...moreArgs) => fn(...args, ...moreArgs);
+        return curry(func, arity - args.length);
+    };
+};
+const tap$1 = (fn) => arg => {
     fn(arg);
     return arg;
-  }
-}
+};
 
-function pointer (path) {
+const pointer = (path) => {
+    const parts = path.split('.');
+    const partial = (obj = {}, parts = []) => {
+        const p = parts.shift();
+        const current = obj[p];
+        return (current === undefined || current === null || parts.length === 0) ?
+            current : partial(current, parts);
+    };
+    const set = (target, newTree) => {
+        let current = target;
+        const [leaf, ...intermediate] = parts.reverse();
+        for (const key of intermediate.reverse()) {
+            if (current[key] === undefined) {
+                current[key] = {};
+                current = current[key];
+            }
+        }
+        current[leaf] = Object.assign(current[leaf] || {}, newTree);
+        return target;
+    };
+    return {
+        get(target) {
+            return partial(target, [...parts]);
+        },
+        set
+    };
+};
 
-  const parts = path.split('.');
-
-  function partial (obj = {}, parts = []) {
-    const p = parts.shift();
-    const current = obj[p];
-    return (current === undefined || parts.length === 0) ?
-      current : partial(current, parts);
-  }
-
-  function set (target, newTree) {
-    let current = target;
-    const [leaf, ...intermediate] = parts.reverse();
-    for (let key of intermediate.reverse()) {
-      if (current[key] === undefined) {
-        current[key] = {};
-        current = current[key];
-      }
+const defaultComparator = (a, b) => {
+    if (a === b) {
+        return 0;
     }
-    current[leaf] = Object.assign(current[leaf] || {}, newTree);
-    return target;
-  }
-
-  return {
-    get(target){
-      return partial(target, [...parts])
-    },
-    set
-  }
-}
-
-function sortByProperty (prop) {
-  const propGetter = pointer(prop).get;
-  return (a, b) => {
-    const aVal = propGetter(a);
-    const bVal = propGetter(b);
-
-    if (aVal === bVal) {
-      return 0;
+    if (a === undefined) {
+        return 1;
     }
-
-    if (bVal === undefined) {
-      return -1;
+    if (b === undefined) {
+        return -1;
     }
-
-    if (aVal === undefined) {
-      return 1;
+    return a < b ? -1 : 1;
+};
+var SortDirection;
+(function (SortDirection) {
+    SortDirection["ASC"] = "asc";
+    SortDirection["DESC"] = "desc";
+    SortDirection["NONE"] = "none";
+})(SortDirection || (SortDirection = {}));
+const sortByProperty = (prop, comparator) => {
+    const propGetter = pointer(prop).get;
+    return (a, b) => comparator(propGetter(a), propGetter(b));
+};
+const defaultSortFactory = (conf) => {
+    const { pointer: pointer$$1, direction = "asc" /* ASC */, comparator = defaultComparator } = conf;
+    if (!pointer$$1 || direction === "none" /* NONE */) {
+        return (array) => [...array];
     }
+    const orderFunc = sortByProperty(pointer$$1, comparator);
+    const compareFunc = direction === "desc" /* DESC */ ? swap(orderFunc) : orderFunc;
+    return (array) => [...array].sort(compareFunc);
+};
 
-    return aVal < bVal ? -1 : 1;
-  }
-}
-
-function sortFactory ({pointer: pointer$$1, direction} = {}) {
-  if (!pointer$$1 || direction === 'none') {
-    return array => [...array];
-  }
-
-  const orderFunc = sortByProperty(pointer$$1);
-  const compareFunc = direction === 'desc' ? swap(orderFunc) : orderFunc;
-
-  return (array) => [...array].sort(compareFunc);
-}
-
-function typeExpression (type) {
-  switch (type) {
-    case 'boolean':
-      return Boolean;
-    case 'number':
-      return Number;
-    case 'date':
-      return (val) => new Date(val);
-    default:
-      return compose(String, (val) => val.toLowerCase());
-  }
-}
-
+var Type;
+(function (Type) {
+    Type["BOOLEAN"] = "boolean";
+    Type["NUMBER"] = "number";
+    Type["DATE"] = "date";
+    Type["STRING"] = "string";
+})(Type || (Type = {}));
+const typeExpression = (type) => {
+    switch (type) {
+        case Type.BOOLEAN:
+            return Boolean;
+        case Type.NUMBER:
+            return Number;
+        case Type.DATE:
+            return val => new Date(val);
+        case Type.STRING:
+            return compose(String, val => val.toLowerCase());
+        default:
+            return val => val;
+    }
+};
+var FilterOperator;
+(function (FilterOperator) {
+    FilterOperator["INCLUDES"] = "includes";
+    FilterOperator["IS"] = "is";
+    FilterOperator["IS_NOT"] = "isNot";
+    FilterOperator["LOWER_THAN"] = "lt";
+    FilterOperator["GREATER_THAN"] = "gt";
+    FilterOperator["GREATER_THAN_OR_EQUAL"] = "gte";
+    FilterOperator["LOWER_THAN_OR_EQUAL"] = "lte";
+    FilterOperator["EQUALS"] = "equals";
+    FilterOperator["NOT_EQUALS"] = "notEquals";
+    FilterOperator["ANY_OF"] = "anyOf";
+})(FilterOperator || (FilterOperator = {}));
+const not = fn => input => !fn(input);
+const is = value => input => Object.is(value, input);
+const lt = value => input => input < value;
+const gt = value => input => input > value;
+const equals = value => input => value === input;
+const includes = value => input => input.includes(value);
+const anyOf = value => input => value.includes(input);
 const operators = {
-  includes(value){
-    return (input) => input.includes(value);
-  },
-  is(value){
-    return (input) => Object.is(value, input);
-  },
-  isNot(value){
-    return (input) => !Object.is(value, input);
-  },
-  lt(value){
-    return (input) => input < value;
-  },
-  gt(value){
-    return (input) => input > value;
-  },
-  lte(value){
-    return (input) => input <= value;
-  },
-  gte(value){
-    return (input) => input >= value;
-  },
-  equals(value){
-    return (input) => value == input;
-  },
-  notEquals(value){
-    return (input) => value != input;
-  }
+    ["includes" /* INCLUDES */]: includes,
+    ["is" /* IS */]: is,
+    ["isNot" /* IS_NOT */]: compose(is, not),
+    ["lt" /* LOWER_THAN */]: lt,
+    ["gte" /* GREATER_THAN_OR_EQUAL */]: compose(lt, not),
+    ["gt" /* GREATER_THAN */]: gt,
+    ["lte" /* LOWER_THAN_OR_EQUAL */]: compose(gt, not),
+    ["equals" /* EQUALS */]: equals,
+    ["notEquals" /* NOT_EQUALS */]: compose(equals, not),
+    ["anyOf" /* ANY_OF */]: anyOf
 };
-
 const every = fns => (...args) => fns.every(fn => fn(...args));
-
-function predicate ({value = '', operator = 'includes', type = 'string'}) {
-  const typeIt = typeExpression(type);
-  const operateOnTyped = compose(typeIt, operators[operator]);
-  const predicateFunc = operateOnTyped(value);
-  return compose(typeIt, predicateFunc);
-}
-
-//avoid useless filter lookup (improve perf)
-function normalizeClauses (conf) {
-  const output = {};
-  const validPath = Object.keys(conf).filter(path => Array.isArray(conf[path]));
-  validPath.forEach(path => {
-    const validClauses = conf[path].filter(c => c.value !== '');
-    if (validClauses.length) {
-      output[path] = validClauses;
-    }
-  });
-  return output;
-}
-
-function filter$1 (filter) {
-  const normalizedClauses = normalizeClauses(filter);
-  const funcList = Object.keys(normalizedClauses).map(path => {
-    const getter = pointer(path).get;
-    const clauses = normalizedClauses[path].map(predicate);
-    return compose(getter, every(clauses));
-  });
-  const filterPredicate = every(funcList);
-
-  return (array) => array.filter(filterPredicate);
-}
-
-var search$1 = function (searchConf = {}) {
-  const {value, scope = []} = searchConf;
-  const searchPointers = scope.map(field => pointer(field).get);
-  if (!scope.length || !value) {
-    return array => array;
-  } else {
-    return array => array.filter(item => searchPointers.some(p => String(p(item)).includes(String(value))))
-  }
+const predicate = ({ value = '', operator = "includes" /* INCLUDES */, type }) => {
+    const typeIt = typeExpression(type);
+    const operateOnTyped = compose(typeIt, operators[operator]);
+    const predicateFunc = operateOnTyped(value);
+    return compose(typeIt, predicateFunc);
+};
+// Avoid useless filter lookup (improve perf)
+const normalizeClauses = (conf) => {
+    const output = {};
+    const validPath = Object.keys(conf).filter(path => Array.isArray(conf[path]));
+    validPath.forEach(path => {
+        const validClauses = conf[path].filter(c => c.value !== '');
+        if (validClauses.length > 0) {
+            output[path] = validClauses;
+        }
+    });
+    return output;
+};
+const filter = (filter) => {
+    const normalizedClauses = normalizeClauses(filter);
+    const funcList = Object.keys(normalizedClauses).map(path => {
+        const getter = pointer(path).get;
+        const clauses = normalizedClauses[path].map(predicate);
+        return compose(getter, every(clauses));
+    });
+    const filterPredicate = every(funcList);
+    return array => array.filter(filterPredicate);
 };
 
-function sliceFactory ({page = 1, size} = {}) {
-  return function sliceFunction (array = []) {
+function re(strs, ...substs) {
+    let reStr = transformRaw(strs.raw[0]);
+    for (const [i, subst] of substs.entries()) {
+        if (subst instanceof RegExp) {
+            reStr += subst.source;
+        } else if (typeof subst === 'string') {
+            reStr += quoteText(subst);
+        } else {
+            throw new Error('Illegal substitution: '+subst);
+        }
+        reStr += transformRaw(strs.raw[i+1]);
+    }
+    let flags = '';
+    if (reStr.startsWith('/')) {
+        const lastSlashIndex = reStr.lastIndexOf('/');
+        if (lastSlashIndex === 0) {
+            throw new Error('If the `re` string starts with a slash, it must end with a second slash and zero or more flags: '+reStr);
+        }
+        flags = reStr.slice(lastSlashIndex+1);
+        reStr = reStr.slice(1, lastSlashIndex);
+    }
+    return new RegExp(reStr, flags);
+}
+
+function transformRaw(str) {
+    return str.replace(/\\`/g, '`');
+}
+
+/**
+ * All special characters are escaped, because you may want to quote several characters inside parentheses or square brackets.
+ */
+function quoteText(text) {
+    return text.replace(/[\\^$.*+?()[\]{}|=!<>:-]/g, '\\$&');
+}
+
+const regexp = (input) => {
+    const { value, scope = [], escape = false, flags = '' } = input;
+    const searchPointers = scope.map(field => pointer(field).get);
+    if (scope.length === 0 || !value) {
+        return (array) => array;
+    }
+    const regex = escape === true ? re `/${value}/${flags}` : new RegExp(value, flags);
+    return (array) => array.filter(item => searchPointers.some(p => regex.test(String(p(item)))));
+};
+
+const emitter = () => {
+    const listenersLists = {};
+    const instance = {
+        on(event, ...listeners) {
+            listenersLists[event] = (listenersLists[event] || []).concat(listeners);
+            return instance;
+        },
+        dispatch(event, ...args) {
+            const listeners = listenersLists[event] || [];
+            for (const listener of listeners) {
+                listener(...args);
+            }
+            return instance;
+        },
+        off(event, ...listeners) {
+            if (event === undefined) {
+                Object.keys(listenersLists).forEach(ev => instance.off(ev));
+            }
+            else {
+                const list = listenersLists[event] || [];
+                listenersLists[event] = listeners.length ? list.filter(listener => !listeners.includes(listener)) : [];
+            }
+            return instance;
+        }
+    };
+    return instance;
+};
+
+const sliceFactory = ({ page = 1, size } = { page: 1 }) => (array = []) => {
     const actualSize = size || array.length;
     const offset = (page - 1) * actualSize;
     return array.slice(offset, offset + actualSize);
-  };
-}
+};
 
-function emitter () {
-
-  const listenersLists = {};
-  const instance = {
-    on(event, ...listeners){
-      listenersLists[event] = (listenersLists[event] || []).concat(listeners);
-      return instance;
-    },
-    dispatch(event, ...args){
-      const listeners = listenersLists[event] || [];
-      for (let listener of listeners) {
-        listener(...args);
-      }
-      return instance;
-    },
-    off(event, ...listeners){
-      if (!event) {
-        Object.keys(listenersLists).forEach(ev => instance.off(ev));
-      } else {
-        const list = listenersLists[event] || [];
-        listenersLists[event] = listeners.length ? list.filter(listener => !listeners.includes(listener)) : [];
-      }
-      return instance;
-    }
-  };
-  return instance;
-}
-
-const TOGGLE_SORT = 'TOGGLE_SORT';
-const DISPLAY_CHANGED = 'DISPLAY_CHANGED';
-const PAGE_CHANGED = 'CHANGE_PAGE';
-const EXEC_CHANGED = 'EXEC_CHANGED';
-const FILTER_CHANGED = 'FILTER_CHANGED';
-const SUMMARY_CHANGED = 'SUMMARY_CHANGED';
-const SEARCH_CHANGED = 'SEARCH_CHANGED';
-const EXEC_ERROR = 'EXEC_ERROR';
-
-function curriedPointer (path) {
-  const {get, set} = pointer(path);
-  return {get, set: curry(set)};
-}
-
-var table$2 = function ({
-  sortFactory,
-  tableState,
-  data,
-  filterFactory,
-  searchFactory
-}) {
-  const table = emitter();
-  const sortPointer = curriedPointer('sort');
-  const slicePointer = curriedPointer('slice');
-  const filterPointer = curriedPointer('filter');
-  const searchPointer = curriedPointer('search');
-
-  const safeAssign = curry((base, extension) => Object.assign({}, base, extension));
-  const dispatch = curry(table.dispatch.bind(table), 2);
-
-  const dispatchSummary = (filtered) => {
-    dispatch(SUMMARY_CHANGED, {
-      page: tableState.slice.page,
-      size: tableState.slice.size,
-      filteredCount: filtered.length
+var SmartTableEvents;
+(function (SmartTableEvents) {
+    SmartTableEvents["TOGGLE_SORT"] = "TOGGLE_SORT";
+    SmartTableEvents["DISPLAY_CHANGED"] = "DISPLAY_CHANGED";
+    SmartTableEvents["PAGE_CHANGED"] = "CHANGE_PAGE";
+    SmartTableEvents["EXEC_CHANGED"] = "EXEC_CHANGED";
+    SmartTableEvents["FILTER_CHANGED"] = "FILTER_CHANGED";
+    SmartTableEvents["SUMMARY_CHANGED"] = "SUMMARY_CHANGED";
+    SmartTableEvents["SEARCH_CHANGED"] = "SEARCH_CHANGED";
+    SmartTableEvents["EXEC_ERROR"] = "EXEC_ERROR";
+})(SmartTableEvents || (SmartTableEvents = {}));
+const curriedPointer = (path) => {
+    const { get, set } = pointer(path);
+    return { get, set: curry(set) };
+};
+const tableDirective = ({ sortFactory, tableState, data, filterFactory, searchFactory }) => {
+    let filteredCount = data.length;
+    let matchingItems = data;
+    const table = emitter();
+    const sortPointer = curriedPointer('sort');
+    const slicePointer = curriedPointer('slice');
+    const filterPointer = curriedPointer('filter');
+    const searchPointer = curriedPointer('search');
+    // We need to register in case the summary comes from outside (like server data)
+    table.on("SUMMARY_CHANGED" /* SUMMARY_CHANGED */, ({ filteredCount: count }) => {
+        filteredCount = count;
     });
-  };
-
-  const exec = ({processingDelay = 20} = {}) => {
-    table.dispatch(EXEC_CHANGED, {working: true});
-    setTimeout(function () {
-      try {
-        const filterFunc = filterFactory(filterPointer.get(tableState));
-        const searchFunc = searchFactory(searchPointer.get(tableState));
-        const sortFunc = sortFactory(sortPointer.get(tableState));
-        const sliceFunc = sliceFactory(slicePointer.get(tableState));
-        const execFunc = compose(filterFunc, searchFunc, tap$1(dispatchSummary), sortFunc, sliceFunc);
-        const displayed = execFunc(data);
-        table.dispatch(DISPLAY_CHANGED, displayed.map(d => {
-          return {index: data.indexOf(d), value: d};
-        }));
-      } catch (e) {
-        table.dispatch(EXEC_ERROR, e);
-      } finally {
-        table.dispatch(EXEC_CHANGED, {working: false});
-      }
-    }, processingDelay);
-  };
-
-  const updateTableState = curry((pter, ev, newPartialState) => compose(
-    safeAssign(pter.get(tableState)),
-    tap$1(dispatch(ev)),
-    pter.set(tableState)
-  )(newPartialState));
-
-  const resetToFirstPage = () => updateTableState(slicePointer, PAGE_CHANGED, {page: 1});
-
-  const tableOperation = (pter, ev) => compose(
-    updateTableState(pter, ev),
-    resetToFirstPage,
-    () => table.exec() // we wrap within a function so table.exec can be overwritten (when using with a server for example)
-  );
-
-  const api = {
-    sort: tableOperation(sortPointer, TOGGLE_SORT),
-    filter: tableOperation(filterPointer, FILTER_CHANGED),
-    search: tableOperation(searchPointer, SEARCH_CHANGED),
-    slice: compose(updateTableState(slicePointer, PAGE_CHANGED), () => table.exec()),
-    exec,
-    eval(state = tableState){
-      return Promise.resolve()
-        .then(function () {
-          const sortFunc = sortFactory(sortPointer.get(state));
-          const searchFunc = searchFactory(searchPointer.get(state));
-          const filterFunc = filterFactory(filterPointer.get(state));
-          const sliceFunc = sliceFactory(slicePointer.get(state));
-          const execFunc = compose(filterFunc, searchFunc, sortFunc, sliceFunc);
-          return execFunc(data).map(d => {
-            return {index: data.indexOf(d), value: d}
-          });
+    const safeAssign = curry((base, extension) => Object.assign({}, base, extension));
+    const dispatch = curry(table.dispatch, 2);
+    const dispatchSummary = (filtered) => {
+        matchingItems = filtered;
+        return dispatch("SUMMARY_CHANGED" /* SUMMARY_CHANGED */, {
+            page: tableState.slice.page,
+            size: tableState.slice.size,
+            filteredCount: filtered.length
         });
-    },
-    onDisplayChange(fn){
-      table.on(DISPLAY_CHANGED, fn);
-    },
-    getTableState(){
-      const sort = Object.assign({}, tableState.sort);
-      const search = Object.assign({}, tableState.search);
-      const slice = Object.assign({}, tableState.slice);
-      const filter = {};
-      for (let prop in tableState.filter) {
-        filter[prop] = tableState.filter[prop].map(v => Object.assign({}, v));
-      }
-      return {sort, search, slice, filter};
-    }
-  };
-
-  const instance = Object.assign(table, api);
-
-  Object.defineProperty(instance, 'length', {
-    get(){
-      return data.length;
-    }
-  });
-
-  return instance;
+    };
+    const exec = ({ processingDelay = 20 } = { processingDelay: 20 }) => {
+        table.dispatch("EXEC_CHANGED" /* EXEC_CHANGED */, { working: true });
+        setTimeout(() => {
+            try {
+                const filterFunc = filterFactory(filterPointer.get(tableState));
+                const searchFunc = searchFactory(searchPointer.get(tableState));
+                const sortFunc = sortFactory(sortPointer.get(tableState));
+                const sliceFunc = sliceFactory(slicePointer.get(tableState));
+                const execFunc = compose(filterFunc, searchFunc, tap$1(dispatchSummary), sortFunc, sliceFunc);
+                const displayed = execFunc(data);
+                table.dispatch("DISPLAY_CHANGED" /* DISPLAY_CHANGED */, displayed.map(d => ({
+                    index: data.indexOf(d),
+                    value: d
+                })));
+            }
+            catch (err) {
+                table.dispatch("EXEC_ERROR" /* EXEC_ERROR */, err);
+            }
+            finally {
+                table.dispatch("EXEC_CHANGED" /* EXEC_CHANGED */, { working: false });
+            }
+        }, processingDelay);
+    };
+    const updateTableState = curry((pter, ev, newPartialState) => compose(safeAssign(pter.get(tableState)), tap$1(dispatch(ev)), pter.set(tableState))(newPartialState));
+    const resetToFirstPage = () => updateTableState(slicePointer, "CHANGE_PAGE" /* PAGE_CHANGED */, { page: 1 });
+    const tableOperation = (pter, ev) => compose(updateTableState(pter, ev), resetToFirstPage, () => table.exec() // We wrap within a function so table.exec can be overwritten (when using with a server for example)
+    );
+    const api = {
+        sort: tableOperation(sortPointer, "TOGGLE_SORT" /* TOGGLE_SORT */),
+        filter: tableOperation(filterPointer, "FILTER_CHANGED" /* FILTER_CHANGED */),
+        search: tableOperation(searchPointer, "SEARCH_CHANGED" /* SEARCH_CHANGED */),
+        slice: compose(updateTableState(slicePointer, "CHANGE_PAGE" /* PAGE_CHANGED */), () => table.exec()),
+        exec,
+        async eval(state = tableState) {
+            const sortFunc = sortFactory(sortPointer.get(state));
+            const searchFunc = searchFactory(searchPointer.get(state));
+            const filterFunc = filterFactory(filterPointer.get(state));
+            const sliceFunc = sliceFactory(slicePointer.get(state));
+            const execFunc = compose(filterFunc, searchFunc, sortFunc, sliceFunc);
+            return execFunc(data).map(d => ({ index: data.indexOf(d), value: d }));
+        },
+        onDisplayChange(fn) {
+            table.on("DISPLAY_CHANGED" /* DISPLAY_CHANGED */, fn);
+        },
+        getTableState() {
+            const sort = Object.assign({}, tableState.sort);
+            const search = Object.assign({}, tableState.search);
+            const slice = Object.assign({}, tableState.slice);
+            const filter$$1 = {};
+            for (const prop of Object.getOwnPropertyNames(tableState.filter)) {
+                filter$$1[prop] = tableState.filter[prop].map(v => Object.assign({}, v));
+            }
+            return { sort, search, slice, filter: filter$$1 };
+        },
+        getMatchingItems() {
+            return [...matchingItems];
+        }
+    };
+    const instance = Object.assign(table, api);
+    Object.defineProperties(instance, {
+        filteredCount: {
+            get() {
+                return filteredCount;
+            }
+        },
+        length: {
+            get() {
+                return data.length;
+            }
+        }
+    });
+    return instance;
 };
 
-var tableDirective = function ({
-  sortFactory: sortFactory$$1 = sortFactory,
-  filterFactory = filter$1,
-  searchFactory = search$1,
-  tableState = {sort: {}, slice: {page: 1}, filter: {}, search: {}},
-  data = []
-}, ...tableDirectives) {
-
-  const coreTable = table$2({sortFactory: sortFactory$$1, filterFactory, tableState, data, searchFactory});
-
-  return tableDirectives.reduce((accumulator, newdir) => {
-    return Object.assign(accumulator, newdir({
-      sortFactory: sortFactory$$1,
-      filterFactory,
-      searchFactory,
-      tableState,
-      data,
-      table: coreTable
-    }));
-  }, coreTable);
+// todo expose and re-export from smart-table-filter
+var FilterType;
+(function (FilterType) {
+    FilterType["BOOLEAN"] = "boolean";
+    FilterType["NUMBER"] = "number";
+    FilterType["DATE"] = "date";
+    FilterType["STRING"] = "string";
+})(FilterType || (FilterType = {}));
+const defaultTableState = () => ({ sort: {}, slice: { page: 1 }, filter: {}, search: {} });
+const smartTable = ({ sortFactory = defaultSortFactory, filterFactory = filter, searchFactory = regexp, tableState = defaultTableState(), data = [] } = {
+    sortFactory: defaultSortFactory,
+    filterFactory: filter,
+    searchFactory: regexp,
+    tableState: defaultTableState(),
+    data: []
+}, ...tableExtensions) => {
+    const coreTable = tableDirective({ sortFactory, filterFactory, tableState, data, searchFactory });
+    return tableExtensions.reduce((accumulator, newdir) => Object.assign(accumulator, newdir({
+        sortFactory,
+        filterFactory,
+        searchFactory,
+        tableState,
+        data,
+        table: coreTable
+    })), coreTable);
 };
-
-const table = tableDirective;
 
 var ext = ({query}) => ({table, tableState}) => {
   const exec = () => {
@@ -1038,7 +1056,7 @@ var ext = ({query}) => ({table, tableState}) => {
 plan$1()
   .test('should dispatch working state change', function * (t) {
     let workingState;
-    const tb = table({data: []}, ext({query: (tableState) => Promise.resolve({summary: {}, data: []})}));
+    const tb = smartTable({data: []}, ext({query: (tableState) => Promise.resolve({summary: {}, data: []})}));
     tb.on('EXEC_CHANGED', ({working}) => {
       workingState = working;
     });
@@ -1051,7 +1069,7 @@ plan$1()
     let workingState;
     let err;
     const error = {message: 'ERROR !!!'};
-    const tb = table({data: []}, ext({query: (tableState) => Promise.reject(error)}));
+    const tb = smartTable({data: []}, ext({query: (tableState) => Promise.reject(error)}));
     tb.on('EXEC_CHANGED', ({working}) => {
       workingState = working;
     });
@@ -1069,8 +1087,8 @@ plan$1()
     t.equal(err, error);
   })
   .test('should dispatch summary changed based on the client value', function * (t) {
-    let summary$$1;
-    const tb = table({data: []}, ext({
+    let summary;
+    const tb = smartTable({data: []}, ext({
       query: (tableState) => Promise.resolve({
         summary: {
           foo: 'bar'
@@ -1078,15 +1096,15 @@ plan$1()
       })
     }));
     tb.on('SUMMARY_CHANGED', s => {
-      summary$$1 = s;
+      summary = s;
     });
     const p = tb.sort({pointer: 'foo'});
     yield p;
-    t.deepEqual(summary$$1, {foo: 'bar'});
+    t.deepEqual(summary, {foo: 'bar'});
   })
   .test('should dispatch display changed based on the client value', function * (t) {
     let data;
-    const tb = table({data: []}, ext({
+    const tb = smartTable({data: []}, ext({
       query: (tableState) => Promise.resolve({
         summary: {
           foo: 'bar'
@@ -1108,7 +1126,7 @@ plan$1()
     );
   })
   .test('should overwrite eval function to resolve with value provided by client', function * (t) {
-    const tb = table({data: []}, ext({
+    const tb = smartTable({data: []}, ext({
       query: (tableState) => Promise.resolve({
         summary: {
           foo: 'bar'
