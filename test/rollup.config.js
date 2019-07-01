@@ -1,9 +1,11 @@
 import  node from 'rollup-plugin-node-resolve';
 export default {
-  entry: './test/index.js',
-  dest: './test/dist/index.js',
-  format: 'iife',
+  input: './test/index.js',
+  output: {
+    file: './test/dist/index.js',
+    format: 'iife',
+    name: 'test',
+    sourcemap: true
+  },
   plugins: [node({jsnext: true})],
-  moduleName: 'test',
-  sourceMap: true
 };
